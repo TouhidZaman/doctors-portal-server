@@ -2,6 +2,7 @@ const { MongoClient, ServerApiVersion } = require("mongodb");
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
+const jwt = require("jsonwebtoken");
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -10,9 +11,42 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+//Getting Token For user
+app.post("/login", (req, res) => {
+   const email = req.body?.email;
+   if (email) {
+      const accessToken = jwt.sign({ email }, process.env.ACCESS_TOKEN_SECRET, {
+         expiresIn: "1d",
+      });
+      res.send({
+         success: true,
+         accessToken,
+      });
+   }
+});
+
+//Verifying Token
+const verifyJWT = (req, res, next) => {
+   const authHeader = req.headers?.authorization;
+   if (!authHeader) {
+      return res.status(401).send({ message: "unauthorized access" });
+   } else {
+      const token = authHeader.split(" ")[1];
+
+      // verify a token symmetric
+      jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
+         if (err) {
+            return res.status(403).send({ message: "forbidden Access" });
+         }
+         // console.log("decoded", decoded);
+         req.decoded = decoded;
+         next();
+      });
+   }
+};
+
 //Mongodb Config
-const uri =
-   `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.gvs9c.mongodb.net/?retryWrites=true&w=majority`;
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.gvs9c.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, {
    useNewUrlParser: true,
    useUnifiedTopology: true,
