@@ -13,77 +13,99 @@ app.use(express.json());
 
 //Getting Token For user
 app.post("/login", (req, res) => {
-   const email = req.body?.email;
-   if (email) {
-      const accessToken = jwt.sign({ email }, process.env.ACCESS_TOKEN_SECRET, {
-         expiresIn: "1d",
-      });
-      res.send({
-         success: true,
-         accessToken,
-      });
-   }
+    const email = req.body?.email;
+    if (email) {
+        const accessToken = jwt.sign({ email }, process.env.ACCESS_TOKEN_SECRET, {
+            expiresIn: "1d",
+        });
+        res.send({
+            success: true,
+            accessToken,
+        });
+    }
 });
 
 //Verifying Token
 const verifyJWT = (req, res, next) => {
-   const authHeader = req.headers?.authorization;
-   if (!authHeader) {
-      return res.status(401).send({ message: "unauthorized access" });
-   } else {
-      const token = authHeader.split(" ")[1];
+    const authHeader = req.headers?.authorization;
+    if (!authHeader) {
+        return res.status(401).send({ message: "unauthorized access" });
+    } else {
+        const token = authHeader.split(" ")[1];
 
-      // verify a token symmetric
-      jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
-         if (err) {
-            return res.status(403).send({ message: "forbidden Access" });
-         }
-         // console.log("decoded", decoded);
-         req.decoded = decoded;
-         next();
-      });
-   }
+        // verify a token symmetric
+        jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
+            if (err) {
+                return res.status(403).send({ message: "forbidden Access" });
+            }
+            // console.log("decoded", decoded);
+            req.decoded = decoded;
+            next();
+        });
+    }
 };
 
 //Mongodb Config
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.gvs9c.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, {
-   useNewUrlParser: true,
-   useUnifiedTopology: true,
-   serverApi: ServerApiVersion.v1,
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    serverApi: ServerApiVersion.v1,
 });
 
 // API Endpoints
 async function run() {
-   try {
-      await client.connect();
-      const serviceCollections = client
-         .db("doctors_portal_DB")
-         .collection("services");
+    try {
+        await client.connect();
+        const serviceCollections = client
+            .db("doctors_portal_DB")
+            .collection("services");
+        const bookingCollection = client
+            .db("doctors_portal_DB")
+            .collection("bookings");
 
-      //Find All Services
-      app.get("/services", async (req, res) => {
-         const query = {};
-         const cursor = serviceCollections.find(query);
-         const services = await cursor.toArray();
-         res.send(services);
-      });
-   } finally {
-      //   await client.close();
-   }
+        //Insert a booking
+        app.post("/bookings", async (req, res) => {
+            const booking = req.body;
+            const query = {
+                treatment: booking?.treatment,
+                date: booking?.date,
+                patient: booking?.patient,
+            };
+
+            const exists = await bookingCollection.findOne(query);
+
+            if (exists) {
+                return res.send({ success: false, booking: exists });
+            } else {
+                const result = await bookingCollection.insertOne(booking);
+                res.send({ success: true, result });
+            }
+        });
+
+        //Find All Services
+        app.get("/services", async (req, res) => {
+            const query = {};
+            const cursor = serviceCollections.find(query);
+            const services = await cursor.toArray();
+            res.send(services);
+        });
+    } finally {
+        //   await client.close();
+    }
 }
 run().catch(console.dir);
 
 //API  Endpoints
 app.get("/", (req, res) => {
-   res.send({
-      success: true,
-      message: "hello from doctors portal server",
-      developedBy: "Muhammad Touhiduzzaman",
-   });
+    res.send({
+        success: true,
+        message: "hello from doctors portal server",
+        developedBy: "Muhammad Touhiduzzaman",
+    });
 });
 
 //Listening to port
 app.listen(port, () => {
-   console.log("listening to port:", port);
+    console.log("listening to port:", port);
 });
