@@ -64,7 +64,7 @@ async function run() {
             .db("doctors_portal_DB")
             .collection("bookings");
 
-        //Insert a booking
+        //Insert a booking appointment
         app.post("/bookings", async (req, res) => {
             const booking = req.body;
             const query = {
@@ -81,6 +81,28 @@ async function run() {
                 const result = await bookingCollection.insertOne(booking);
                 res.send({ success: true, result });
             }
+        });
+
+        //Get Available Slots of Services
+        app.get("/available", async (req, res) => {
+            const date = req.query.date;
+            const query = { date };
+            const services = await serviceCollections.find().toArray();
+            const bookings = await bookingCollection.find(query).toArray();
+
+            //Warning: This is not proper approach use mongodb aggregation instead
+            services.forEach((service) => {
+                const serviceBookings = bookings.filter(
+                    (booking) => booking.treatment === service.name
+                );
+                const bookedSlots = serviceBookings.map((sb) => sb.slot);
+                // service.bookedSlots = bookedSlots;
+                const available = service.slots.filter(
+                    (slot) => !bookedSlots.includes(slot)
+                );
+                service.slots = available;
+            });
+            res.send(services);
         });
 
         //Find All Services
