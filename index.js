@@ -78,6 +78,43 @@ async function run() {
             res.send({ result, accessToken });
         });
 
+        //Getting users
+        app.get("/users", verifyJWT, async (req, res) => {
+            const users = await userCollection.find().toArray();
+            res.send(users);
+        });
+
+        //Creating user and getting token for user
+        app.put("/users/admin/:email", verifyJWT, async (req, res) => {
+            const requester = req.decoded.email;
+            const requesterAccount = await userCollection.findOne({
+                email: requester,
+            });
+            if (requesterAccount.role === "admin") {
+                const email = req.params?.email;
+                const filter = { email };
+                const updateDoc = {
+                    $set: {
+                        role: "admin",
+                    },
+                };
+
+                const result = await userCollection.updateOne(filter, updateDoc);
+
+                res.send(result);
+            } else {
+                res.status(403).send({ message: "forbidden" });
+            }
+        });
+
+        //Verify Admin
+        app.get("/admin/:email", verifyJWT, async (req, res) => {
+            const email = req.params?.email;
+            const user = await userCollection.findOne({ email });
+            const isAdmin = user.role === "admin";
+            res.send({ admin: isAdmin });
+        });
+
         //Insert a booking appointment
         app.post("/bookings", async (req, res) => {
             const booking = req.body;
