@@ -11,32 +11,18 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-//Getting Token For user
-app.post("/login", (req, res) => {
-    const email = req.body?.email;
-    if (email) {
-        const accessToken = jwt.sign({ email }, process.env.ACCESS_TOKEN_SECRET, {
-            expiresIn: "1d",
-        });
-        res.send({
-            success: true,
-            accessToken,
-        });
-    }
-});
-
 //Verifying Token
 const verifyJWT = (req, res, next) => {
     const authHeader = req.headers?.authorization;
     if (!authHeader) {
-        return res.status(401).send({ message: "unauthorized access" });
+        return res.status(401).send({ message: "Unauthorized access" });
     } else {
         const token = authHeader.split(" ")[1];
 
         // verify a token symmetric
         jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
             if (err) {
-                return res.status(403).send({ message: "forbidden Access" });
+                return res.status(403).send({ message: "Forbidden access" });
             }
             // console.log("decoded", decoded);
             req.decoded = decoded;
@@ -63,6 +49,34 @@ async function run() {
         const bookingCollection = client
             .db("doctors_portal_DB")
             .collection("bookings");
+        const userCollection = client.db("doctors_portal_DB").collection("users");
+
+        //Creating user and getting token for user
+        app.put("/users/:email", async (req, res) => {
+            const email = req.params?.email;
+            const user = req.body;
+
+            const filter = { email };
+            const options = { upsert: true };
+            const updateDoc = {
+                $set: user,
+            };
+
+            const result = await userCollection.updateOne(
+                filter,
+                updateDoc,
+                options
+            );
+            const accessToken = jwt.sign(
+                { email },
+                process.env.ACCESS_TOKEN_SECRET,
+                {
+                    expiresIn: "1d",
+                }
+            );
+            // console.log(result, accessToken);
+            res.send({ result, accessToken });
+        });
 
         //Insert a booking appointment
         app.post("/bookings", async (req, res) => {
@@ -80,6 +94,19 @@ async function run() {
             } else {
                 const result = await bookingCollection.insertOne(booking);
                 res.send({ success: true, result });
+            }
+        });
+
+        //Get Appointment bookings for specific  User
+        app.get("/bookings", verifyJWT, async (req, res) => {
+            const patient = req.query?.patient;
+            const decodedUser = req.decoded?.email;
+            if (decodedUser === patient) {
+                const query = { patient };
+                const bookings = await bookingCollection.find(query).toArray();
+                return res.send(bookings);
+            } else {
+                return res.status(403).send({ message: "forbidden Access" });
             }
         });
 
